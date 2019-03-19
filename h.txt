@@ -1,0 +1,116 @@
+@echo off
+setlocal ENABLEDELAYEDEXPANSION
+set time=%DATE:~0,4%%DATE:~5,2%%DATE:~8,2%_%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%
+set Doc="Logs_%time%"
+REM Set a string with an arbitrary number of substrings separated by semi colons
+@echo $$  version: 1.0
+@echo $$  等待设备连接..
+set /a sum=0
+set /a ii=1
+for /f %%i in ('adb devices') do (
+set /a sum+=!ii!
+set /a ii=1
+)
+
+if !sum! == 2 (
+	md "%Doc%"
+	@echo $$  设备连接成功
+
+	@echo $$  抓出trace
+	md "%Doc%/anr"
+	adb wait-for-device pull /data/anr %Doc%/anr
+
+	@echo $$  抓出crash
+	adb wait-for-device shell dumpsys dropbox system_app_crash --print > %Doc%/Crash.txt
+
+	@echo $$  抓出aee_exp
+	md "%Doc%/data_aee_exp"
+	md "%Doc%/vendor_aee_exp"
+
+	REM Set a string with an arbitrary number of substrings separated by semi colons
+
+	for /f %%m in ('adb shell ls /data/vendor/mtklog/aee_exp') do (set teststring=!teststring!%%m )
+
+	REM Do something with each substring
+	:stringLOOP_vendor_aee_exp
+		REM Stop when the string is empty
+		if "!teststring!" EQU "" goto END
+
+		for /f "delims= " %%a in ("!teststring!") do set substring=%%a
+
+			REM Do something with the substring - 
+			REM we just echo it for the purposes of demo       			
+			adb wait-for-device pull /data/vendor/mtklog/aee_exp/!substring! %Doc%/vendor_aee_exp
+		
+	REM Now strip off the leading substring
+	:striploop_vendor_aee_exp
+		set stripchar=!teststring:~0,1!
+		set teststring=!teststring:~1!
+
+		if "!teststring!" EQU "" goto stringLOOP_vendor_aee_exp
+
+		if "!stripchar!" NEQ " " goto striploop_vendor_aee_exp
+
+		goto stringLOOP_vendor_aee_exp
+		)
+	:END
+	
+	for /f %%x in ('adb shell ls /data/aee_exp') do (set teststring=!teststring!%%x )
+
+	REM Do something with each substring
+	:stringLOOP_data_aee_exp
+		REM Stop when the string is empty
+		if "!teststring!" EQU "" goto END
+
+		for /f "delims= " %%q in ("!teststring!") do set substring=%%q
+
+			REM Do something with the substring - 
+			REM we just echo it for the purposes of demo  
+			adb wait-for-device pull /data/aee_exp/!substring! %Doc%/data_aee_exp
+		
+	REM Now strip off the leading substring
+	:striploop_data_aee_exp
+		set stripchar=!teststring:~0,1!
+		set teststring=!teststring:~1!
+
+		if "!teststring!" EQU "" goto stringLOOP_data_aee_exp
+
+		if "!stripchar!" NEQ " " goto striploop_data_aee_exp
+
+		goto stringLOOP_data_aee_exp
+		)
+		:END
+	
+	@echo $$  抓出tombstones
+	adb wait-for-device pull /data/tombstones %Doc%/tombstones
+
+	@echo $$  抓出手机状态
+	adb wait-for-device shell ps > %Doc%/ps.txt
+	adb wait-for-device shell dumpstate > %Doc%/dumpstate.txt
+	adb wait-for-device shell dumpsys > %Doc%/dumpsys.txt
+	adb wait-for-device shell top -d 2 -n 5 > %Doc%/top.txt
+	adb wait-for-device shell service list  >  %Doc%/serviceList.txt
+
+	@echo $$  抓出mtklog
+	md "%Doc%/mtklog"
+	adb wait-for-device pull /storage/sdcard0/mtklog %Doc%/mtklog
+	adb wait-for-device pull /storage/sdcard1/mtklog %Doc%/mtklog
+
+	@echo $$  抓出recovery log
+	md "%Doc%/recovery"
+	adb wait-for-device pull /data/misc/recovery %Doc%/recovery
+
+	@echo $$  抓出微信 log
+	md "%Doc%/xlog"
+	adb wait-for-device pull /storage/sdcard0/tencent/micromsg/xlog %Doc%/xlog
+	
+) else (
+
+	if !sum! == 2 (
+		@echo $$  完成
+	) else (
+		@echo $$  设备数量校验失败!
+	)
+)
+
+pause
